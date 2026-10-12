@@ -13,6 +13,7 @@ flex-direction: column;
 background-color: #f4f4f9;
     margin: 0;
 padding: 20px;
+    overflow-x: hidden;
 }
 h1 {
   color: #333;
@@ -55,6 +56,15 @@ top: 0;
 cursor: pointer;
   touch-action: none;
 }
+#confetti-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 999;
+}
 #message {
     margin-top: 20px;
   font-size: 1.3rem;
@@ -80,6 +90,7 @@ button:hover {
     </style>
 </head>
 <body>
+<canvas id="confetti-canvas"></canvas>
 <h1>Scratch Card Game</h1>
 <div id="win-counter">Wins: 0</div>
   <div class="card-container">
@@ -101,7 +112,9 @@ button:hover {
 <script>
 const canvas = document.getElementById('scratch-canvas');
  const ctx = canvas.getContext('2d');
-  const cells = document.querySelectorAll('.grid-cell');
+  const confettiCanvas = document.getElementById('confetti-canvas');
+   const confettiCtx = confettiCanvas.getContext('2d');
+    const cells = document.querySelectorAll('.grid-cell');
    const messageEl = document.getElementById('message');
     const resetBtn = document.getElementById('reset-btn');
      const winCounterEl = document.getElementById('win-counter');
@@ -114,9 +127,73 @@ const WIN_PATTERNS = [
 let isScratching = false;
 let isGameOver = false;
 let totalWins = 0;
+let particles = [];
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+function playScratchSound() {
+  initAudio();
+  if (!audioCtx) return;
+  const bufferSize = audioCtx.sampleRate * 0.04;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 1200;
+  noise.connect(filter);
+  filter.connect(audioCtx.destination);
+  noise.start();
+}
+function playWinSound() {
+  initAudio();
+  if (!audioCtx) return;
+  const notes = [523.25, 659.25, 783.99, 1046.50];
+  notes.forEach((freq, index) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const startTime = audioCtx.currentTime + index * 0.1;
+    osc.start(startTime);
+    gain.gain.setValueAtTime(0.1, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+    osc.stop(startTime + 0.3);
+  });
+}
+function playLoseSound() {
+  initAudio();
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+  osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+  osc.stop(audioCtx.currentTime + 0.3);
+}
+function resizeConfetti() {
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeConfetti);
+resizeConfetti();
     function initGame() {
 isGameOver = false;
-  messageEl.textContent = "Scratch me!";
+  messageEl.textContent = "Scratch to reveal your prize!";
+   particles = [];
    const symbolsList = generateSymbols();
     cells.forEach((cell, index) => {
 cell.textContent = symbolsList[index];
@@ -175,6 +252,7 @@ const { x, y } = getMousePos(e);
    ctx.beginPath();
     ctx.arc(x, y, 25, 0, Math.PI * 2);
 ctx.fill();
+  playScratchSound();
   checkScratchPercentage();
 }
 function checkScratchPercentage() {
@@ -199,13 +277,49 @@ const symbolsArray = Array.from(cells).map(cell => cell.textContent);
   if (winner) {
    totalWins++;
    winCounterEl.textContent = "Wins: " + totalWins;
-   messageEl.textContent = "WINNER";
+   messageEl.textContent = "🎉 WINNER! You got 3 in a line!";
     messageEl.style.color = "#27ae60";
+    launchConfetti();
+    playWinSound();
 } else {
-  messageEl.textContent = "LOSER";
+  messageEl.textContent = "❌ Try Again! No line matched.";
    messageEl.style.color = "#c0392b";
+   playLoseSound();
 }
 }
+function launchConfetti() {
+  for (let i = 0; i < 100; i++) {
+    particles.push({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+      vx: (Math.random() - 0.5) * 12,
+      vy: (Math.random() - 0.7) * 12,
+      size: Math.random() * 8 + 4,
+      color: ['#f1c40f', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6'][Math.floor(Math.random() * 5)],
+      alpha: 1
+    });
+  }
+}
+function updateConfetti() {
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  particles.forEach((p, index) => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.4;
+    p.alpha -= 0.01;
+    if (p.alpha <= 0) {
+      particles.splice(index, 1);
+      return;
+    }
+    confettiCtx.save();
+    confettiCtx.globalAlpha = p.alpha;
+    confettiCtx.fillStyle = p.color;
+    confettiCtx.fillRect(p.x, p.y, p.size, p.size);
+    confettiCtx.restore();
+  });
+  requestAnimationFrame(updateConfetti);
+}
+updateConfetti();
 canvas.addEventListener('mousedown', () => isScratching = true);
  canvas.addEventListener('mouseup', () => isScratching = false);
   canvas.addEventListener('mousemove', scratch);
