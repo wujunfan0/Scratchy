@@ -199,7 +199,7 @@ window.addEventListener('resize', resizeConfetti);
 resizeConfetti();
     function initGame() {
 isGameOver = false;
-  messageEl.textContent = "Scratch to reveal your prize!";
+  messageEl.textContent = "Scratch ME";
    particles = [];
    const symbolsList = generateSymbols();
     cells.forEach((cell, index) => {
@@ -286,14 +286,14 @@ const symbolsArray = Array.from(cells).map(cell => cell.textContent);
    currentStreak++;
    winCounterEl.textContent = "Wins: " + totalWins;
    streakCounterEl.textContent = "Streak: " + currentStreak;
-   messageEl.textContent = "🎉 WINNER! You got 3 in a line!";
+   messageEl.textContent = "WINNERRRRR";
     messageEl.style.color = "#27ae60";
     launchConfetti();
     playWinSound();
 } else {
   currentStreak = 0;
   streakCounterEl.textContent = "Streak: " + currentStreak;
-  messageEl.textContent = "❌ Try Again! No line matched.";
+  messageEl.textContent = "LOSERRR";
    messageEl.style.color = "#c0392b";
    playLoseSound();
 }
