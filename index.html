@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scratch Card</title>
+    <style>
+body {
+    font-family: Arial, sans-serif;
+  display: flex;
+flex-direction: column;
+    align-items: center;
+background-color: #f4f4f9;
+    margin: 0;
+padding: 20px;
+}
+h1 {
+  color: #333;
+}
+#win-counter {
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #555;
+}
+    .card-container {
+position: relative;
+width: 320px;
+      height: 320px;
+border-radius: 12px;
+      overflow: hidden;
+box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  user-select: none;
+    }
+.grid {
+    display: grid;
+  grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+width: 100%;
+    height: 100%;
+background-color: #ffffff;
+}
+    .grid-cell {
+display: flex;
+    justify-content: center;
+align-items: center;
+    font-size: 2.2rem;
+border: 1px dashed #e0e0e0;
+    box-sizing: border-box;
+}
+#scratch-canvas {
+  position: absolute;
+top: 0;
+  left: 0;
+cursor: pointer;
+  touch-action: none;
+}
+#message {
+    margin-top: 20px;
+  font-size: 1.3rem;
+    font-weight: bold;
+min-height: 30px;
+    color: #2c3e50;
+}
+button {
+  margin-top: 10px;
+    padding: 10px 20px;
+font-size: 1rem;
+    font-weight: bold;
+color: #fff;
+    background-color: #3498db;
+border: none;
+    border-radius: 6px;
+cursor: pointer;
+    transition: background-color 0.2s;
+}
+button:hover {
+    background-color: #2980b9;
+}
+    </style>
+</head>
+<body>
+<h1>Scratch Card Game</h1>
+<div id="win-counter">Wins: 0</div>
+  <div class="card-container">
+    <div class="grid" id="symbols-grid">
+      <div class="grid-cell"></div>
+  <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+  <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+  <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+  <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+    </div>
+<canvas id="scratch-canvas" width="320" height="320"></canvas>
+  </div>
+<div id="message">Scratch to reveal your prize!</div>
+  <button id="reset-btn">New Ticket</button>
+<script>
+const canvas = document.getElementById('scratch-canvas');
+ const ctx = canvas.getContext('2d');
+  const cells = document.querySelectorAll('.grid-cell');
+   const messageEl = document.getElementById('message');
+    const resetBtn = document.getElementById('reset-btn');
+     const winCounterEl = document.getElementById('win-counter');
+const SYMBOLS = ['💎', '⭐️', '🍒', '7️⃣', '🍀', '🔔'];
+const WIN_PATTERNS = [
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],
+  [0, 4, 8], [2, 4, 6]
+];
+let isScratching = false;
+let isGameOver = false;
+let totalWins = 0;
+    function initGame() {
+isGameOver = false;
+  messageEl.textContent = "Scratch me!";
+   const symbolsList = generateSymbols();
+    cells.forEach((cell, index) => {
+cell.textContent = symbolsList[index];
+});
+ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#b5b5b5';
+   ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#888888';
+ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'center';
+   ctx.fillText('SCRATCH HERE', canvas.width / 2, canvas.height / 2);
+}
+function checkWinState(arr) {
+  for (let pattern of WIN_PATTERNS) {
+    const [a, b, c] = pattern;
+    if (arr[a] && arr[a] === arr[b] && arr[a] === arr[c]) {
+      return true;
+    }
+  }
+  return false;
+}
+function generateSymbols() {
+    const isWinner = Math.random() < 0.4;
+let board = Array(9).fill(null);
+  if (isWinner) {
+   const pattern = WIN_PATTERNS[Math.floor(Math.random() * WIN_PATTERNS.length)];
+    const sym = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+     pattern.forEach(idx => board[idx] = sym);
+      for (let i = 0; i < 9; i++) {
+       if (!board[i]) {
+        board[i] = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+       }
+      }
+  } else {
+   do {
+    for (let i = 0; i < 9; i++) {
+     board[i] = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    }
+   } while (checkWinState(board));
+}
+return board;
+}
+function getMousePos(e) {
+const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+x: clientX - rect.left,
+  y: clientY - rect.top
+};
+}
+function scratch(e) {
+    if (!isScratching || isGameOver) return;
+const { x, y } = getMousePos(e);
+  ctx.globalCompositeOperation = 'destination-out';
+   ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
+ctx.fill();
+  checkScratchPercentage();
+}
+function checkScratchPercentage() {
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+   let clearedPixels = 0;
+    for (let i = 3; i < pixels.length; i += 4) {
+if (pixels[i] === 0) {
+  clearedPixels++;
+}
+}
+const percentage = (clearedPixels / (canvas.width * canvas.height)) * 100;
+  if (percentage > 50 && !isGameOver) {
+   isGameOver = true;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+     evaluateWin();
+}
+}
+function evaluateWin() {
+const symbolsArray = Array.from(cells).map(cell => cell.textContent);
+  let winner = checkWinState(symbolsArray);
+  if (winner) {
+   totalWins++;
+   winCounterEl.textContent = "Wins: " + totalWins;
+   messageEl.textContent = "WINNER";
+    messageEl.style.color = "#27ae60";
+} else {
+  messageEl.textContent = "LOSER";
+   messageEl.style.color = "#c0392b";
+}
+}
+canvas.addEventListener('mousedown', () => isScratching = true);
+ canvas.addEventListener('mouseup', () => isScratching = false);
+  canvas.addEventListener('mousemove', scratch);
+canvas.addEventListener('touchstart', (e) => {
+isScratching = true;
+  scratch(e);
+});
+canvas.addEventListener('touchend', () => isScratching = false);
+ canvas.addEventListener('touchmove', scratch);
+resetBtn.addEventListener('click', initGame);
+initGame();
+</script>
+</body>
+</html>
